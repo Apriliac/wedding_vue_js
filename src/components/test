@@ -1,0 +1,837 @@
+<script setup>
+// Reveal
+function reveal() {
+  var reveals = document.querySelectorAll(".reveal");
+
+  for (var i = 0; i < reveals.length; i++) {
+    var windowHeight = window.innerHeight;
+    var elementTop = reveals[i].getBoundingClientRect().top;
+    var elementVisible = 150;
+
+    if (elementTop < windowHeight - elementVisible) {
+      reveals[i].classList.add("active");
+    } else {
+      reveals[i].classList.remove("active");
+    }
+  }
+}
+
+window.addEventListener("scroll", reveal);
+// end of reveal
+
+// QUOTE
+import { ref, onMounted, watchEffect } from "vue";
+import { useDatabaseList } from 'vuefire'
+import { getDatabase, set, ref as dbRef, remove as dbRemove } from "firebase/database";
+import { useDevicesList, useUserMedia } from "@vueuse/core";
+import { getStorage, ref as storageRef, uploadBytes,getDownloadURL } from 'firebase/storage';
+
+
+
+const firebaseDB = 'pesan/';
+const db = getDatabase();
+const quoteDBsRef = dbRef(db, firebaseDB);
+const quoteDBs = useDatabaseList(quoteDBsRef);
+var maxLength = 0;
+
+function writeToIndexDB(dataUser){
+   const request = indexedDB.open(dbName, 2);
+    const updatedquoteData = { id: dataUser.id, title: dataUser.title, description: dataUser.description,count:dataUser.count };
+
+    request.onerror = (event) => {
+      console.error("Error opening database:", event.target.error);
+    };
+    
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+
+      const updateTransaction = db.transaction(tableName, "readwrite");
+      const quoteObjectStore = updateTransaction.objectStore(tableName);
+
+      const updateRequest = quoteObjectStore.put(updatedquoteData);
+
+      updateRequest.onsuccess = (event) => {
+         console.log("Data updated successfully");
+         updatedData.value = "Yes";
+      };
+
+      updateRequest.onerror = (event) => {
+         console.error("Error updating data", event.target.error);
+         updatedData.value = "No";
+      };
+
+      updateTransaction.oncomplete = () => {
+         db.close();
+         isModalAdd.value = false;
+      };
+    };
+
+}
+
+watchEffect(() => {
+   if(quoteDBs.value.length>0){
+      maxLength = quoteDBs.value.length;
+      for (let index = 0; index < quoteDBs.value.length; index++) {
+         writeToIndexDB(quoteDBs.value[index])
+         // if(index === quoteDBs.value.length-1){
+         // readData()
+         // }
+      }
+
+   }
+});
+
+function writeUserData(eventData ) {
+   const quoteToAdd = { id: eventData.id,
+     title: eventData.title,
+     phone: eventData.phone,
+     attend: eventData.attend,
+     description: eventData.description,
+     count:eventData.count  };
+   const db = getDatabase();
+   set(dbRef(db, firebaseDB + eventData.id),quoteToAdd);
+}
+
+// function removeUserData(idUser) {
+//    const db = getDatabase();
+//    set(dbRef(db, firebaseDB + idUser),null);
+// }
+
+
+
+onMounted(() => {
+   readData();
+  setInterval(() => {
+   readData();
+  }, 5000);
+})
+
+
+// Create Broadcast Channel and listen to messages sent to it
+const broadcast = new BroadcastChannel("sw-update-channel");
+
+broadcast.onmessage = (event) => {
+   if (event.data && event.data.type === "CRITICAL_SW_UPDATE") {
+      // Show "update to refresh" banner to the user.
+      const payload = event.data.payload;
+      // Log the payload to the console
+      console.log(payload);
+      //show()
+   }
+};
+// Define reactive variables
+const title = ref("Employee of the month");
+
+// input Data
+var isEdit = false;
+var nameInput = ref("");
+var phoneInput = ref("");
+var radioInput = ref("");
+var descriptionInput = ref("");
+
+const dbName = "IndexDBAxe";
+const tableName = "tableName";
+const addedData = ref(null);
+const updatedData = ref(null);
+// const removedData = ref(null)
+let isModalAdd = ref(false);
+
+// SUBMIT DATA
+async function addData() {
+    const request = indexedDB.open(dbName, 2);
+
+    request.onerror = (event) => {
+      console.error("Error opening database:", event.target.error);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      const objectStore = db.createObjectStore(tableName, { keyPath: "id" });
+      objectStore.createIndex("quoteDB", "quoteDB", { unique: false });
+    };
+
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+
+      // Check if the object store exists
+      if (!db.objectStoreNames.contains(tableName)) {
+          console.error("Object store does not exist:", tableName);
+          db.close();
+          return;
+      }
+
+      const addTransaction = db.transaction(tableName, "readwrite");
+      const quoteObjectStore = addTransaction.objectStore(tableName);
+
+      const quoteCount = quoteObjectStore.count();
+
+      quoteCount.onsuccess = function (e) {
+         const recordCount = e.target.result;
+         const randomID = Date.now().toString();
+         const quoteToAdd = { id: randomID, 
+          title: nameInput.value, 
+         phone: phoneInput.value,
+          attend : radioInput.value,
+          description: descriptionInput.value,
+           count:0 };
+
+        const addRequest = quoteObjectStore.add(quoteToAdd);
+
+        addRequest.onsuccess = (event) => {
+          console.log("Data added successfully");
+          addedData.value = "Yes";
+        };
+
+        addRequest.onerror = (event) => {
+          console.error("Error adding data", event.target.error);
+          addedData.value = "No";
+        };
+
+         addTransaction.oncomplete = () => {
+            console.log("Add transaction completed");
+            db.close();
+            isModalAdd.value = false;
+            readData();
+            writeUserData(quoteToAdd)
+            // harusnya fungsi masukin ke server (AXE)
+         };
+      };
+    };
+}
+
+// REMOVE
+// async function removeData(id) {
+//    // Remove from realtime database
+//    const db = getDatabase();
+//    const realtimeRef = dbRef(db, firebaseDB + id);
+//    await dbRemove(realtimeRef);
+
+//    // Remove from local indexedDB
+//    const indexedDBRequest = indexedDB.open(dbName, 2);
+
+//    indexedDBRequest.onerror = (event) => {
+//       console.error("Error opening database:", event.target.error);
+//    };
+
+//    indexedDBRequest.onsuccess = (event) => {
+//       const indexedDB = event.target.result;
+//       const removeTransaction = indexedDB.transaction(tableName, "readwrite");
+//       const quoteObjectStore = removeTransaction.objectStore(tableName);
+
+//       const removeRequest = quoteObjectStore.delete(id);
+
+//       removeRequest.onsuccess = (event) => {
+//          console.log("Data removed successfully");
+//          removedData.value = "Yes";
+//       };
+
+//       removeRequest.onerror = (event) => {
+//          console.error("Error removing data", event.target.error);
+//          removedData.value = "No";
+//       };
+
+//       removeTransaction.oncomplete = () => {
+//          indexedDB.close();
+//       };
+//    };
+// }
+// VIEW DATA
+var quote = ref([]);
+async function readData() {
+   const request = indexedDB.open(dbName, 2);
+
+   request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+
+      if (!db.objectStoreNames.contains(tableName)) {
+         db.createObjectStore(tableName, { keyPath: "id" });
+      }
+   };
+
+   request.onsuccess = (event) => {
+      const db = event.target.result;
+
+      const readTransaction = db.transaction(tableName, "readonly");
+      const quoteObjectStore = readTransaction.objectStore(tableName);
+
+      const quoteCursor = quoteObjectStore.openCursor();
+      quote.value=[]
+      quoteCursor.onsuccess = (event) => {
+         const cursor = event.target.result;
+         if (cursor) {
+            console.log('ccursor.value',cursor.value)
+            quote.value.push(cursor.value);
+            cursor.continue();
+         } else {
+            console.log("Data read successfully");
+            db.close();
+         }
+      };
+      
+
+      readTransaction.onerror = (event) => {
+         console.error("Error opening transaction:", event.target.error);
+         db.close();
+      };
+      
+      quoteCursor.onerror = (event) => {
+         console.error("Error opening cursor:", event.target.error);
+         db.close();
+      };
+   };
+//  end of quote
+}
+
+
+
+
+
+
+</script>
+
+<template>
+<section>
+  <div class="container reveal backgroundimage">
+    <h2 class="h2-title">Doa dan Pesan</h2>
+    <div class="container-banner" >
+      <img class="image-decoration absolute-top-right elementToFadeIn" src="../assets/img/theme1/cover-floral-kanan.png"/>
+      <img class="image-decoration absolute-bottom-left elementToFadeIn" src="../assets/img/theme1/cover-floral-kiri.png"/>
+     <div class="container-pesan">
+        <div class="container-title">
+          KIRIMKAN PESAN
+        </div>
+        <div class="container-card">
+          <v-card>
+               <v-card-text>
+                  <v-row no-gutters>
+                    <v-col cols="12">
+                      <v-text-field 
+                        label="Nama Lengkap" 
+                        required 
+                        v-model="nameInput" 
+                        placeholder="Masukan nama anda">
+                      </v-text-field>
+                    </v-col>
+                    <v-col cols="12">
+                      <v-text-field 
+                        label="Nomor HP" 
+                        required 
+                        v-model="phoneInput" 
+                        placeholder="Masukan nomor telepon anda">
+                      </v-text-field>
+                    </v-col>
+                    <v-col cols="12">
+                      <v-radio-group label="Apakah anda bersedia hadir?" 
+                      v-model="radioInput" inline >
+                        <v-radio label="Ya" selected value="true"></v-radio>
+                        <v-radio label="Tidak" value="false"></v-radio>
+                      </v-radio-group>
+                    </v-col>
+                  </v-row>
+                  <v-row no-gutters>
+                    <v-col cols="12">
+                     <v-textarea
+                        label="Kirim Ucapan" 
+                        v-model="descriptionInput" 
+                        placeholder="Masukan ucapan untuk mempelai">
+                      </v-textarea>
+                    </v-col>
+                  </v-row>
+
+                  <div style="margin-top: 20px">
+                     <v-btn class="button-dialog" style="width: 100%" v-bind:disabled="(descriptionInput == '')&&(nameInput == '')&&(phoneInput == '')" @click="addData">Kirim</v-btn>
+                  </div>
+               </v-card-text>
+            </v-card>
+        </div>
+    </div>
+    </div>
+    </div>
+</section>
+<section >
+  <div class="container reveal backgroundimage">
+    <div style="display: flex;justify-content: center;align-items: center;width: 100vw; margin:20px 10px;">
+      <h2 class="h2-title">Terima kasih untuk Ucapan dan Doa nya</h2>
+    </div>
+    <div class="container-banner" >
+      <img class="image-decoration absolute-bottom-left elementToFadeIn" src="../assets/img/theme1/cover-floral-kiri.png"/>
+      <img class="image-decoration absolute-bottom-right elementToFadeIn" src="../assets/img/theme1/cover-floral-kiri-copy.png"/>
+      
+      <div class="border-quote">
+        <div v-for="item, index in quote" :key="item.id">
+          <v-container>
+            <v-row>
+              <v-col cols="12">
+                <span class="name-title">{{ item.title }}</span><br>
+                <span class="description">{{ item.description }}</span>
+                <!-- BUTTON FUNGSI REMOVEDATA DENGAN ID ITEM -->
+                <!-- <v-btn @click="removeData(item.id)">Hapus</v-btn> -->
+              </v-col>
+            </v-row>
+          </v-container>
+        </div>
+    </div>
+    </div>
+  </div>
+</section>
+</template>
+
+<style scoped>
+@import url("../assets/css/general-styling.css");
+@import url("../assets/css/general-animation.css");
+
+section{
+  display: flex;
+  align-items: center;
+  min-height: 100vh;
+}
+section:nth-child(1){
+  color: whitesmoke;
+  border-bottom: white solid 1px;
+  }
+section:nth-child(2){
+  color: #42455a;
+  background: whitesmoke;
+} 
+section:nth-child(3){
+  color: whitesmoke;
+}
+section:nth-child(4){
+  color: #42455a;
+  background: whitesmoke;
+}
+section .container{
+  /* background-color: #00c2cb; */
+}
+section h1{
+  font-size: 3rem;
+  margin: 20px;
+}
+section h2{
+  font-size: 40px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+
+
+@media (max-width: 575px) {
+  .container-pesan{
+  width: 100vw;
+  height: 100vh;
+  flex-direction: column;
+  padding: 20px;
+  display: flex;
+  
+}
+
+.container-banner{
+   white-space: nowrap;
+   width: 100vw;
+   height: auto;
+   padding: 0px;
+   }
+
+
+
+.h2-title{
+  font-size: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.image-decoration{
+  width: 30vw;
+  height: auto;
+  position: absolute;
+  z-index: 1;/* z-index: 0; */
+  /* ganti ke 0 biar kebelakang kotak */
+}
+  .container-card{
+  width: 100%;
+  height: 40vh;
+}
+.container-title{
+  display: none;
+  width: 100%;
+  height: 10vh;
+  font-size: 16px;
+  justify-content: center;
+  align-items: center;
+}
+.name-title{
+  font-size: 18px;
+  margin: 0px;
+  font-weight: 700;
+}
+.description{
+  font-size: 16px;
+  margin-left: 10px;
+}
+.border-quote{
+  border: 2px solid black;
+  border-radius: 10px;
+  margin: 5px;
+  background-color:rgb(253, 247, 240) ;
+  min-height: 120vh;
+  /* position: relative; */
+  /* KALAU MAU BIKIN KE BELAKANG BORDER*/
+}
+.backgroundimage{
+        min-height: 120vh;
+        width: 100vw;
+        background-color: rgb(252, 210, 102);
+        background-image: linear-gradient(180deg, rgba(2, 0, 36, 0) 0%, rgba(51, 51, 51, 0) 0%),
+        url('../assets/img/theme1/weddingbg1.jpg');
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center;
+      }
+}
+
+@media (min-width: 576px) and (max-width: 767px) {
+  .container-pesan{
+  width: 100vw;
+  height: 100vh;
+  flex-direction: column;
+  padding: 20px;
+  display: flex;
+}
+
+.container-banner{
+   white-space: nowrap;
+   width: 100vw;
+   height: auto;
+   padding: 0px;
+   }
+   .h2-title{
+  font-size: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.image-decoration{
+  width: 25vw;
+  height: auto;
+  position: absolute;
+  z-index: 1;/* z-index: 0; */
+  /* ganti ke 0 biar kebelakang kotak */
+}
+  .container-card{
+  width: 100%;
+  height: 40vh;
+}
+.container-title{
+  display: none;
+  width: 100%;
+  height: 10vh;
+  font-size: 16px;
+  justify-content: center;
+  align-items: center;
+}
+.name-title{
+  font-size: 18px;
+  margin: 0px;
+  font-weight: 700;
+}
+.description{
+  font-size: 16px;
+  margin-left: 10px;
+}
+.border-quote{
+  border: 2px solid black;
+  border-radius: 10px;
+  margin: 5px;
+  background-color:rgb(253, 247, 240) ;
+  min-height: 120vh;
+  position: relative;
+  z-index: 0;
+  /* z-index: 1; */
+  /* BIAR BUNGA MAJU KEDEPAN BORDER */
+}
+.backgroundimage{
+        min-height: 120vh;
+        width: 100vw;
+        background-color: rgb(252, 210, 102);
+        background-image: linear-gradient(180deg, rgba(2, 0, 36, 0) 0%, rgba(51, 51, 51, 0) 0%),
+        url('../assets/img/theme1/weddingbg1.jpg');
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center;
+      }
+}
+
+@media (min-width: 768px ) and (max-width: 991px) {
+  .container-pesan{
+  width: 100vw;
+  height: 100vh;
+  flex-direction: column;
+  padding: 20px;
+  display: flex;
+}
+.container-banner{
+  white-space: nowrap;
+  width: 100vw;
+  height: auto;
+  padding: 0px;
+  }
+  .h2-title{
+ font-size: 20px;
+ position: relative;
+ z-index: 2;
+}
+.image-decoration{
+  width: 25vw;
+  height: auto;
+  position: absolute;
+  z-index: 1;/* z-index: 0; */
+  /* ganti ke 0 biar kebelakang kotak */
+}
+.border-quote{
+  border: 2px solid black;
+  border-radius: 10px;
+  margin: 5px;
+  background-color:rgb(253, 247, 240) ;
+  min-height: 120vh;
+  position: relative;
+  z-index: 0;
+  /* z-index: 1; */
+  /* BIAR BUNGA MAJU KEDEPAN BORDER */
+}
+  .container-card{
+  width: 100%;
+  height: 40vh;
+}
+.container-title{
+  display: none;
+  width: 100%;
+  height: 10vh;
+  font-size: 16px;
+  justify-content: center;
+  align-items: center;
+}
+.name-title{
+  font-size: 18px;
+  margin: 0px;
+  font-weight: 700;
+}
+.description{
+  font-size: 16px;
+  margin-left: 10px;
+}
+.backgroundimage{
+        min-height: 120vh;
+        width: 100vw;
+        background-color: rgb(252, 210, 102);
+        background-image: linear-gradient(180deg, rgba(2, 0, 36, 0) 0%, rgba(51, 51, 51, 0) 0%),
+        url('../assets/img/theme1/weddingbg1.jpg');
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center;
+      }
+}
+
+@media (min-width: 992px) {
+  .container-pesan{
+  width: 100vw;
+  height: 100vh;
+  flex-direction: row;
+  justify-content: space-evenly;
+  padding: 20px;
+  display: flex;
+}
+.container-banner{
+  white-space: nowrap;
+  width: 100vw;
+  height: auto;
+  padding: 0px;
+  }
+  .h2-title{
+ font-size: 30px;
+ position: relative;
+ z-index: 2;
+}
+.image-decoration{
+  width: 25vw;
+  height: auto;
+  position: absolute;
+  z-index: 1;/* z-index: 0; */
+  /* ganti ke 0 biar kebelakang kotak */
+}
+.border-quote{
+  border: 2px solid black;
+  border-radius: 10px;
+  margin: 5px;
+  background-color:rgb(253, 247, 240) ;
+  min-height: 120vh;
+  position: relative;
+  z-index: 0;
+  /* z-index: 1; */
+  /* BIAR BUNGA MAJU KEDEPAN BORDER */
+}
+  .container-card{
+  width: 40vw;
+  height: 40vh;
+  background-color: black;
+}
+.container-title{
+  width: 25vw;
+  height: 40vh;
+  font-size: 50px;
+  margin: 20px;
+}
+.name-title{
+  font-size: 18px;
+  margin: 0px;
+  font-weight: 700;
+}
+.description{
+  font-size: 16px;
+  margin-left: 10px;
+}
+
+.backgroundimage{
+        min-height: 120vh;
+        width: 100vw;
+        background-color: rgb(252, 210, 102);
+        background-image: linear-gradient(180deg, rgba(2, 0, 36, 0) 0%, rgba(51, 51, 51, 0) 0%),
+        url('../assets/img/theme1/weddingbg1.jpg');
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center;
+      }
+}
+.reveal{
+  position: relative;
+  transform: translateY(150px);
+  opacity: 0;
+  transition: 1s all ease;
+}
+
+.reveal.active{
+  transform: translateY(0);
+  opacity: 1;
+}
+
+</style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{/* test */}
+async function removeQuote(id) {
+  // Remove from realtime database
+  const db = getDatabase();
+  const realtimeRef = dbRef(db, firebaseDB + id);
+  await dbRemove(realtimeRef);
+
+  // Remove from local indexedDB
+  const indexedDBRequest = indexedDB.open(dbName, 2);
+
+  indexedDBRequest.onerror = (event) => {
+    console.error("Error opening database:", event.target.error);
+  };
+
+  indexedDBRequest.onsuccess = (event) => {
+    const indexedDB = event.target.result;
+    const removeTransaction = indexedDB.transaction(tableName, "readwrite");
+    const quoteObjectStore = removeTransaction.objectStore(tableName);
+
+    const removeRequest = quoteObjectStore.delete(id);
+
+    removeRequest.onsuccess = (event) => {
+      console.log("Data removed successfully from indexedDB");
+      removedData.value = "Yes";
+    };
+
+    removeRequest.onerror = (event) => {
+      console.error("Error removing data from indexedDB", event.target.error);
+      removedData.value = "No";
+    };
+
+    removeTransaction.oncomplete = () => {
+      indexedDB.close();
+    };
+  };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script setup>
+import MainComponent1 from './component/MainComponent1.vue'
+import LandingPage from './components/LandingPage.vue'
+import MainComponent from './components/MainComponent.vue'
+import HeaderComponent from './components/shared/Header.vue'
+import FooterComponent from './components/shared/Footer.vue'
+import BridesGroomComponent from './components/BridesGroomComponent.vue'
+import WeddingQuoteComponent from './components/WeddingQuote.vue'
+import AcaraPernikahan from './components/AcaraPernikahan.vue'
+import Gallery from './components/Gallery.vue'
+
+</script>
+
+<template>
+  <div style="overflow: hidden !important;">
+    <MainComponent1/>
+  </div>
+  
+  <!-- <HeaderComponent/> -->
+  <div style="overflow: hidden !important;">
+    <!-- <LandingPage/> -->
+    <!-- <MainComponent/> -->
+    <!-- <BridesGroomComponent/>
+    <AcaraPernikahan/>
+    <Gallery/>
+    <WeddingQuoteComponent/> -->
+  </div>
+ 
+  <!-- <FooterComponent/> -->
+</template>
+
+
+
+<style scoped>
+/* .logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.vue:hover {
+  filter: drop-shadow(0 0 2em #42b883aa);
+} */
+</style>

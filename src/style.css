@@ -1,0 +1,173 @@
+@import url("https://fonts.googleapis.com/css2?family=Kalam&family=Sacramento&family=Work+Sans:ital,wght@0,500;1,200&display=swap" ); 
+@import url("https://fonts.googleapis.com/css2?family=Caveat&family=Playfair+Display:ital@1&display=swap");
+:root {
+   font-family:Georgia, 'Times New Roman', Times, serif;
+   line-height: 1.5;
+   font-weight: 400;
+
+   color-scheme: light dark;
+   color: rgba(255, 255, 255, 0.87);
+   background-color: #242424;
+
+   font-synthesis: none;
+   text-rendering: optimizeLegibility;
+   -webkit-font-smoothing: antialiased;
+   -moz-osx-font-smoothing: grayscale;
+   -webkit-text-size-adjust: 100%;
+   overflow-block: hidden;
+   overflow-y: visible;
+   overflow-x: hidden;
+   scroll-behavior: smooth;
+   scrollbar-width: none;
+}
+/* Hide scrollbar for Chrome, Safari and Opera */
+/* .example::-webkit-scrollbar {
+   display: none;
+ }
+  */
+ /* Hide scrollbar for IE, Edge and Firefox */
+ /* .example {
+   -ms-overflow-style: none;  /* IE and Edge */
+   /*scrollbar-width: none; */ /* Firefox */
+  
+.v-input__prepend {
+   display: none !important;
+}
+
+a {
+   font-weight: 500;
+   color: #646cff;
+   text-decoration: inherit;
+}
+a:hover {
+   color: #535bf2;
+}
+
+a {
+   font-weight: 500;
+   color: #646cff;
+   text-decoration: inherit;
+}
+a:hover {
+   color: #535bf2;
+}
+
+body {
+   margin: 0;
+   background-color: #ffffff;
+   /* display: flex;
+   place-items: center; */
+   color: black !important;
+}
+
+h1 {
+   font-size: 3.2em;
+   line-height: 1.1;
+}
+
+button {
+   border-radius: 8px;
+   border: 1px solid transparent;
+   padding: 0.6em 1.2em;
+   font-size: 1em;
+   font-weight: 500;
+   font-family: inherit;
+   background-color: #1a1a1a;
+   cursor: pointer;
+   transition: border-color 0.25s;
+}
+
+.v-btn {
+   margin: 4px;
+}
+
+button:hover {
+   border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+   outline: 4px auto -webkit-focus-ring-color;
+}
+
+  
+venue::before{
+    content: '';
+    background-color: bisque;
+    filter: blur();
+    background-size: cover;
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    box-sizing: border-box;
+    opacity: 70%;
+}
+
+venue h2{
+    font-family: 'sacramento',cursive;
+    font-size: 5rem;
+    color: #f14e95;
+    font-weight: bold;
+    position: relative;
+    text-align: center;
+    top: 27%;
+    right: 0;
+}
+ 
+
+
+
+#app {
+   /* max-width: 1280px; */
+   /* margin: 0 auto; */
+   /* text-align: center; */
+   /* overflow: ; */
+}
+
+@media (prefers-color-scheme: light) {
+   :root {
+      color: #213547;
+      background-color: #ffffff;
+   }
+   a:hover {
+      color: #747bff;
+   }
+   button {
+      background-color: #f9f9f9;
+   }
+}
+
+@media (max-width: 599px) {
+   p {
+     font-size: smaller;
+   }
+   .header-title, .footer-title {
+      font-size: small;
+   }
+   .header-main {
+      font-size: medium;
+   }
+ }
+ 
+ @media (min-width: 600px) and (max-width: 959px) {
+   p {
+     font-size: small;
+   }
+   .header-title, .footer-title {
+      font-size: medium;
+   }
+   .header-main {
+      font-size: large;
+   }
+ }
+
+ @media (min-width: 960px) {
+   p {
+      font-size: medium;
+   }
+   .header-title, .footer-title {
+      font-size: large;
+   }
+   .header-main {
+      font-size: larger;
+   }
+ }
